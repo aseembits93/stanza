@@ -344,23 +344,30 @@ def split_underscores(tree):
 
     children = tree.children
     new_children = []
+    append_new_child = new_children.append  # local var for efficiency in tight loop
     for child in children:
-        if child.is_preterminal():
-            if '_' not in child.children[0].label:
-                new_children.append(child)
+        # Hoist method and attribute access for performance
+        is_preterminal = child.is_preterminal()
+        if is_preterminal:
+            grandchild = child.children[0]
+            label_str = grandchild.label
+            if '_' not in label_str:
+                append_new_child(child)
                 continue
 
-            if child.label.split("-")[0] not in WORD_TO_PHRASE:
+            label_tag = child.label
+            label_tag_base = label_tag.split("-", 1)[0]
+            phrase_type = WORD_TO_PHRASE.get(label_tag_base)
+            if phrase_type is None:
                 raise ValueError("SPLITTING {}".format(child))
             pieces = []
-            for piece in child.children[0].label.split("_"):
-                # This may not be accurate, but we already retag the treebank anyway
+            for piece in label_str.split("_"):
                 if len(piece) == 0:
                     raise ValueError("A word started or ended with _")
-                pieces.append(Tree(child.label, Tree(piece)))
-            new_children.append(Tree(WORD_TO_PHRASE[child.label.split("-")[0]], pieces))
+                pieces.append(Tree(label_tag, Tree(piece)))
+            append_new_child(Tree(phrase_type, pieces))
         else:
-            new_children.append(split_underscores(child))
+            append_new_child(split_underscores(child))
 
     return Tree(tree.label, new_children)
 
