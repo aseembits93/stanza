@@ -1,5 +1,3 @@
-
-
 import stanza
 from stanza.protobuf import DependencyEnhancerRequest, Document, Language
 from stanza.server.java_protobuf_requests import send_request, add_sentence, JavaProtobufContext
@@ -18,14 +16,16 @@ def build_enhancer_request(doc, language, pronouns_pattern):
     elif language.lower() in ("zh", "zh-hans", "chinese"):
         request.language = Language.UniversalChinese
     else:
-        raise ValueError("Sorry, but language " + language + " is not supported yet.  Either set a pronouns pattern or file an issue at https://stanfordnlp.github.io/stanza suggesting a mechanism for converting this language")
+        raise ValueError(
+            "Sorry, but language " + language + " is not supported yet.  Either set a pronouns pattern or file an issue at https://stanfordnlp.github.io/stanza suggesting a mechanism for converting this language"
+        )
 
     request_doc = request.document
     request_doc.text = doc.text
     num_tokens = 0
     for sent_idx, sentence in enumerate(doc.sentences):
-        request_sentence = add_sentence(request_doc.sentence, sentence, num_tokens)
-        num_tokens = num_tokens + sum(len(token.words) for token in sentence.tokens)
+        request_sentence, num_words = add_sentence(request_doc.sentence, sentence, num_tokens)
+        num_tokens += num_words
 
         graph = request_sentence.basicDependencies
         nodes = []
