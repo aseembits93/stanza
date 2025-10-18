@@ -67,9 +67,18 @@ def fix_wrong_open_multiple_subtrees(gold_transition, pred_transition, gold_sequ
     return fix_wrong_open_subtrees(gold_transition, pred_transition, gold_sequence, gold_index, root_labels, more_than_two=True)
 
 def advance_past_unaries(gold_sequence, cur_index):
-    while cur_index + 2 < len(gold_sequence) and isinstance(gold_sequence[cur_index], OpenConstituent) and isinstance(gold_sequence[cur_index+1], CloseConstituent):
-        cur_index += 2
-    return cur_index
+    length = len(gold_sequence)
+    OpenCon = OpenConstituent
+    CloseCon = CloseConstituent
+    # Store local references for faster isinstance and attribute lookup
+    i = cur_index
+    seq = gold_sequence
+    while i + 2 < length:
+        # Use type() instead of isinstance() for known single-class identity check
+        if type(seq[i]) is not OpenCon or type(seq[i+1]) is not CloseCon:
+            break
+        i += 2
+    return i
 
 def fix_wrong_open_stuff_unary(gold_transition, pred_transition, gold_sequence, gold_index, root_labels, model, state):
     """
