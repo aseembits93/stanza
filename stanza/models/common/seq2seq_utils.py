@@ -26,11 +26,9 @@ def change_lr(optimizer, new_lr):
         param_group['lr'] = new_lr
 
 def flatten_indices(seq_lens, width):
-    flat = []
-    for i, l in enumerate(seq_lens):
-        for j in range(l):
-            flat.append(i * width + j)
-    return flat
+    return [i * width + j
+            for i, l in enumerate(seq_lens)
+            for j in range(l)]
 
 def keep_partial_grad(grad, topk):
     """
