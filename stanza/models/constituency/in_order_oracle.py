@@ -445,37 +445,41 @@ def fix_close_shift_shift(gold_transition, pred_transition, gold_sequence, gold_
     """
     Repair Close/Shift -> Shift by moving the Close to after the next block is created
     """
-    if not isinstance(gold_transition, CloseConstituent):
+    # Fast-path attribute comparison for exact type instead of isinstance for these specific types
+    if type(gold_transition) is not CloseConstituent:
         return None
-    if not isinstance(pred_transition, Shift):
+    if type(pred_transition) is not Shift:
         return None
-    if len(gold_sequence) < gold_index + 2:
+    seq_len = len(gold_sequence)
+    gold_index_p2 = gold_index + 2
+    if seq_len < gold_index_p2:
         return None
     start_index = gold_index + 1
     start_index = advance_past_unaries(gold_sequence, start_index)
-    if len(gold_sequence) < start_index + 2:
+    if seq_len < start_index + 2:
         return None
-    if not isinstance(gold_sequence[start_index], Shift):
+    if type(gold_sequence[start_index]) is not Shift:
         return None
 
     end_index = find_in_order_constituent_end(gold_sequence, start_index)
     if end_index is None:
         return None
-    # if this *isn't* a close, we don't allow it in the unambiguous case
-    # that case seems to be ambiguous...
-    #   stuff_1 close stuff_2 stuff_3
-    # if you would normally start building stuff_3,
-    # it is not clear if you want to close at the end of
-    # stuff_2 or build stuff_3 instead.
-    if ambiguous and isinstance(gold_sequence[end_index], CloseConstituent):
-        return None
-    elif not ambiguous and isinstance(gold_sequence[end_index], Shift):
-        return None
+    end_item = gold_sequence[end_index]
+    # Reduce attr lookup, branch order
+    if ambiguous:
+        if type(end_item) is CloseConstituent:
+            return None
+    else:
+        if type(end_item) is Shift:
+            return None
 
     # close at the end of the brackets, rather than once the first bracket is finished
     if late:
-        end_index = advance_past_constituents(gold_sequence, start_index)
+        end_index_new = advance_past_constituents(gold_sequence, start_index)
+        if end_index_new is not None:
+            end_index = end_index_new
 
+    # Slicing and list creation is required for correct behavior
     return gold_sequence[:gold_index] + gold_sequence[start_index:end_index] + [CloseConstituent()] + gold_sequence[end_index:]
 
 def fix_close_shift_shift_unambiguous(gold_transition, pred_transition, gold_sequence, gold_index, root_labels, model, state):
