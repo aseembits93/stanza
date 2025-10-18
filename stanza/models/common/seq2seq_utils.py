@@ -60,15 +60,13 @@ def unmap_with_copy(indices, src_tokens, vocab):
     Unmap a list of list of indices, by optionally copying from src_tokens.
     """
     result = []
+    id2word = vocab.id2word
     for ind, tokens in zip(indices, src_tokens):
-        words = []
-        for idx in ind:
-            if idx >= 0:
-                words.append(vocab.id2word[idx])
-            else:
-                idx = -idx - 1 # flip and minus 1
-                words.append(tokens[idx])
-        result += [words]
+        words = [
+            id2word[idx] if idx >= 0 else tokens[-idx - 1]
+            for idx in ind
+        ]
+        result.append(words)
     return result
 
 def prune_decoded_seqs(seqs):
