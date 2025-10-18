@@ -122,10 +122,14 @@ def eliminate_overlapping_entities(entities_list):
     # we eliminate entities which are at least partially contained in one ocurring prior to them
     # this amounts to removing overlap
     subsumed = set([])
-    for sub_i, sub in enumerate(entities_list):
-        for over in entities_list[:sub_i]:
-            if any([target in over["targets"] for target in sub["targets"]]):
-                subsumed.add(sub["ent_id"])
+    seen_targets = set()
+    
+    for sub in entities_list:
+        sub_targets = set(sub["targets"])
+        if seen_targets & sub_targets:
+            subsumed.add(sub["ent_id"])
+        seen_targets.update(sub_targets)
+    
     return [entity for entity in entities_list if entity["ent_id"] not in subsumed]
 
 
