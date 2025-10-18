@@ -308,19 +308,39 @@ def add_dependencies(resources, lang, processor_list):
      ['depparse', (ModelSpecification(processor='depparse', package='gsd', dependencies=(('pretrain', 'gsd'),)),)]]
     """
     lang_resources = resources[lang]
+    # Cache variant sets and constant for faster lookup in inner loops
+    processor_variants = PROCESSOR_VARIANTS
+    lemma = LEMMA
+
+    # Pre-resolve the .get chains to reduce repeated dict lookups
+    get_processor = lang_resources.get
+
     for item in processor_list:
         processor, model_specs = item
+        # Fast-path: stash a set for variant lookup so Python doesn't re-lookup each time
+        processor_variant_set = processor_variants[processor]
+        is_lemma = (processor == lemma)
         new_model_specs = []
         for model_spec in model_specs:
-            # skip dependency checking for external variants of processors and identity lemmatizer
-            if not any([
-                    model_spec.package in PROCESSOR_VARIANTS[processor],
-                    processor == LEMMA and model_spec.package == 'identity'
-                ]):
-                dependencies = lang_resources.get(processor, {}).get(model_spec.package, {}).get('dependencies', [])
-                dependencies = [(dependency['model'], dependency['package']) for dependency in dependencies]
+            pkg = model_spec.package
+            # Skip dependency checking for external variants and identity lemmatizer
+            if not (pkg in processor_variant_set or (is_lemma and pkg == 'identity')):
+                proc_dict = get_processor(processor, None)
+                if proc_dict is not None:
+                    pkg_dict = proc_dict.get(pkg, None)
+                    if pkg_dict is not None:
+                        deps = pkg_dict.get('dependencies')
+                        if deps:
+                            dependencies = [(d['model'], d['package']) for d in deps]
+                        else:
+                            dependencies = []
+                    else:
+                        dependencies = []
+                else:
+                    dependencies = []
+                # _replace is slow, so check if there's any actual dependency change
                 model_spec = model_spec._replace(dependencies=tuple(dependencies))
-                logger.debug("Found dependencies %s for processor %s model %s", dependencies, processor, model_spec.package)
+                logger.debug("Found dependencies %s for processor %s model %s", dependencies, processor, pkg)
             new_model_specs.append(model_spec)
         item[1] = tuple(new_model_specs)
     return processor_list
