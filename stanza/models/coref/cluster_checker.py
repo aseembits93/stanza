@@ -200,7 +200,10 @@ class ClusterChecker:
 
     @staticmethod
     def _phi4(c1, c2):
-        return 2 * len([m for m in c1 if m in c2]) / float(len(c1) + len(c2))
+        # Optimization: convert c2 to a set to reduce lookup time from O(N) to O(1)
+        c2_set = set(c2)
+        overlap = sum(1 for m in c1 if m in c2_set)
+        return 2 * overlap / float(len(c1) + len(c2))
 
     @staticmethod
     def _ceafe(clusters: List[List[Hashable]], gold_clusters: List[List[Hashable]]):
