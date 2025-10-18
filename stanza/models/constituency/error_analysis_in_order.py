@@ -27,7 +27,8 @@ class FirstError(Enum):
     MISSING_BRACKET_CASCADE     = 12
 
 def advance_past_unaries(sequence, idx):
-    while idx + 2 < len(sequence) and isinstance(sequence[idx+1], OpenConstituent) and isinstance(sequence[idx+2], CloseConstituent):
+    seq_len = len(sequence)
+    while idx + 2 < seq_len and type(sequence[idx+1]) is OpenConstituent and type(sequence[idx+2]) is CloseConstituent:
         idx += 2
     return idx
 
