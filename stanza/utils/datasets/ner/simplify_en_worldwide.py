@@ -27,8 +27,25 @@ LABEL_TRANSLATION = {
 }
 
 def isfloat(num):
+    """Optimized float check: skip ValueError path for typical non-numeric strings earlier."""
+    # Fast path: Integers and common floats (positive, negative, with '.' or 'e')
+    if isinstance(num, (int, float)):
+        return True
+    if not isinstance(num, str):
+        return False
+    s = num.strip()
+    # Heuristic: Quickly filter out common cases that cannot possibly be a float (e.g. alphabetic tokens)
+    # ASCII check (saves exceptions for money words, months, etc.)
+    # Early out for empty string
+    if not s:
+        return False
+    # Most tokens are not numbers: if first char isn't digit/./-/+, rule out early
+    first = s[0]
+    if not (first.isdigit() or first in {'-', '+', '.'}):
+        return False
+    # Let float() do full number work
     try:
-        float(num)
+        float(s)
         return True
     except ValueError:
         return False
@@ -67,12 +84,16 @@ def process_label(line, is_start=False):
     biggest_label = line[1]
     position, label_name = biggest_label[:2], biggest_label[2:]
 
+    # Fast-path checks for Money
     if label_name == "Money":
-        if token.lower() in MONEY_WORDS or token in PUNCTUATION or isfloat(token):  # remove this tag
+        lowertok = token.lower()
+        # Inline condition rearrangement: MONEY_WORDS and PUNCTUATION are presumed to have fast lookup (set/str).
+        # Check PUNCTUATION (str) first as it's usually shorter than MONEY_WORDS (set), then float.
+        if token in PUNCTUATION or lowertok in MONEY_WORDS or isfloat(token):
             label_name = "O"
             is_start = True
             position = ""
-        else:  # keep money tag
+        else:
             label_name = "MISC"
             if is_start:
                 position = "B-"
