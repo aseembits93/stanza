@@ -171,11 +171,13 @@ def add_sentence(request_sentences, sentence, num_tokens):
     """
     request_sentence = request_sentences.add()
     request_sentence.tokenOffsetBegin = num_tokens
-    request_sentence.tokenOffsetEnd = num_tokens + sum(len(token.words) for token in sentence.tokens)
+    num_words = 0
     for token in sentence.tokens:
         for word in token.words:
             add_token(request_sentence.token, word, token)
-    return request_sentence
+            num_words += 1
+    request_sentence.tokenOffsetEnd = num_tokens + num_words
+    return request_sentence, num_words
 
 def add_word_to_graph(graph, word, sent_idx):
     """
