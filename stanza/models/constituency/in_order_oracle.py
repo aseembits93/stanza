@@ -67,7 +67,13 @@ def fix_wrong_open_multiple_subtrees(gold_transition, pred_transition, gold_sequ
     return fix_wrong_open_subtrees(gold_transition, pred_transition, gold_sequence, gold_index, root_labels, more_than_two=True)
 
 def advance_past_unaries(gold_sequence, cur_index):
-    while cur_index + 2 < len(gold_sequence) and isinstance(gold_sequence[cur_index], OpenConstituent) and isinstance(gold_sequence[cur_index+1], CloseConstituent):
+    """
+    Advance cur_index past any unary Open-Close pairs.
+    """
+    OpenType = OpenConstituent
+    CloseType = CloseConstituent
+    gold_sequence_len = len(gold_sequence)
+    while cur_index + 2 < gold_sequence_len and type(gold_sequence[cur_index]) is OpenType and type(gold_sequence[cur_index + 1]) is CloseType:
         cur_index += 2
     return cur_index
 
@@ -178,7 +184,7 @@ def fix_open_shift(gold_transition, pred_transition, gold_sequence, gold_index, 
 
     cur_index = gold_index
     cur_index = advance_past_unaries(gold_sequence, cur_index)
-    if not isinstance(gold_sequence[cur_index], OpenConstituent):
+    if type(gold_sequence[cur_index]) is not OpenConstituent:
         return None
     if gold_sequence[cur_index].top_label in root_labels:
         return None
@@ -187,17 +193,18 @@ def fix_open_shift(gold_transition, pred_transition, gold_sequence, gold_index, 
     stuff_start = cur_index + 1
     # can't be a Close, since we just went past an Open and checked for unaries
     # can't be an Open, since two Open in a row is illegal
-    assert isinstance(gold_sequence[stuff_start], Shift)
+    assert type(gold_sequence[stuff_start]) is Shift
     stuff_end = advance_past_constituents(gold_sequence, stuff_start)
     # stuff_end is now the Close which ends NT_X
     cur_index = stuff_end + 1
-    if cur_index >= len(gold_sequence):
+    gold_sequence_len = len(gold_sequence)
+    if cur_index >= gold_sequence_len:
         return None
-    if isinstance(gold_sequence[cur_index], OpenConstituent):
+    if type(gold_sequence[cur_index]) is OpenConstituent:
         cur_index = advance_past_unaries(gold_sequence, cur_index)
-        if cur_index >= len(gold_sequence):
+        if cur_index >= gold_sequence_len:
             return None
-    if isinstance(gold_sequence[cur_index], OpenConstituent):
+    if type(gold_sequence[cur_index]) is OpenConstituent:
         # an Open here signifies that there was a bracket containing X underneath Y
         # TODO: perhaps try to salvage something out of that situation?
         return None
