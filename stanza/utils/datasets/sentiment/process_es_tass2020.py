@@ -87,14 +87,11 @@ def read_sentences(fin):
     """
     Read ids and text from the given file
     """
-    lines = []
-    for line_idx, line in enumerate(fin):
-        line = line.decode("utf-8")
-        pieces = line.split(maxsplit=1)
-        if len(pieces) < 2:
-            continue
-        lines.append(pieces)
-    return lines
+    return [
+        pieces
+        for line in fin
+        if len((pieces := line.decode("utf-8").split(maxsplit=1))) >= 2
+    ]
 
 def open_read_sentences(filename, zip_filename):
     """
