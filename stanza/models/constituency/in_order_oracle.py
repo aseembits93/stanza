@@ -101,12 +101,12 @@ def fix_wrong_open_stuff_unary(gold_transition, pred_transition, gold_sequence, 
     # at this point, stuff_end points to the Close which occurred after stuff_2
     # also, stuff_start points to the first transition which makes stuff_2, the Shift
     cur_index = stuff_end + 1
-    while isinstance(gold_sequence[cur_index], OpenConstituent):
+    while cur_index < len(gold_sequence) and type(gold_sequence[cur_index]) is OpenConstituent:
         if gold_sequence[cur_index] == pred_transition:
             return gold_sequence[:gold_index] + [pred_transition] + gold_sequence[stuff_start:stuff_end] + gold_sequence[cur_index+1:]
         # this was an OpenConstituent, but not the OpenConstituent we guessed
         # maybe there's a unary transition which lets us try again
-        if cur_index + 2 < len(gold_sequence) and isinstance(gold_sequence[cur_index + 1], CloseConstituent):
+        if cur_index + 2 < len(gold_sequence) and type(gold_sequence[cur_index + 1]) is CloseConstituent:
             cur_index = cur_index + 2
         else:
             break
