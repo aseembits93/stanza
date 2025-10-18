@@ -69,7 +69,8 @@ def process_cache(cached_lines):
         array = line.split("\t")
         if len(array) < MIN_NUM_FIELD:
             array = line.split()
-        assert len(array) >= MIN_NUM_FIELD and len(array) <= MAX_NUM_FIELD, "Got unexpected line length: {}".format(array)
+        if not (MIN_NUM_FIELD <= len(array) <= MAX_NUM_FIELD):
+            raise AssertionError("Got unexpected line length: {}".format(array))
         tokens.append(array[0])
         ner_tags.append(array[-1])
     return (tokens, ner_tags)
