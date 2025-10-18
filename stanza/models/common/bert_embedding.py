@@ -35,25 +35,39 @@ def update_max_length(model_name, tokenizer):
         tokenizer.model_max_length = 512
 
 def load_tokenizer(model_name, tokenizer_kwargs=None, local_files_only=False):
-    if model_name:
-        # note that use_fast is the default
-        try:
-            from transformers import AutoTokenizer
-        except ImportError:
-            raise ImportError("Please install transformers library for BERT support! Try `pip install transformers`.")
-        bert_args = BERT_ARGS.get(model_name, dict())
-        if not model_name.startswith("vinai/phobert"):
-            bert_args["add_prefix_space"] = True
-        if tokenizer_kwargs:
-            bert_args.update(tokenizer_kwargs)
-        bert_args['local_files_only'] = local_files_only
-        bert_tokenizer = AutoTokenizer.from_pretrained(model_name, **bert_args)
-        update_max_length(model_name, bert_tokenizer)
-        if model_name == 'princeton-nlp/Sheared-LLaMA-1.3B':
-            bert_tokenizer.pad_token = bert_tokenizer.eos_token
-            logger.debug("Tokenizer does not have a pad_token - setting to %s (%s)", bert_tokenizer.pad_token, bert_tokenizer.eos_token)
-        return bert_tokenizer
-    return None
+    if not model_name:
+        return None
+
+    # Import AutoTokenizer once, outside hot path
+    try:
+        from transformers import AutoTokenizer
+    except ImportError:
+        raise ImportError("Please install transformers library for BERT support! Try `pip install transformers`.")
+
+    # Avoid unnecessary dict allocation; use a fresh dict only if needed
+    bert_args = BERT_ARGS.get(model_name)
+    if bert_args is None:
+        bert_args = {}
+    else:
+        # Defensive: avoid accidental mutation of source BERT_ARGS dicts
+        bert_args = bert_args.copy()
+
+    # Only set 'add_prefix_space' if needed
+    if not model_name.startswith("vinai/phobert"):
+        bert_args["add_prefix_space"] = True
+
+    if tokenizer_kwargs:
+        bert_args.update(tokenizer_kwargs)
+    bert_args['local_files_only'] = local_files_only
+
+    bert_tokenizer = AutoTokenizer.from_pretrained(model_name, **bert_args)
+    update_max_length(model_name, bert_tokenizer)
+
+    if model_name == 'princeton-nlp/Sheared-LLaMA-1.3B':
+        bert_tokenizer.pad_token = bert_tokenizer.eos_token
+        logger.debug("Tokenizer does not have a pad_token - setting to %s (%s)", bert_tokenizer.pad_token, bert_tokenizer.eos_token)
+
+    return bert_tokenizer
 
 def load_bert(model_name, tokenizer_kwargs=None, local_files_only=False):
     if model_name:
