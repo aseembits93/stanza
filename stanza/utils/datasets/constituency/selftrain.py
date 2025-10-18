@@ -150,51 +150,85 @@ def tokenize_docs(docs, pipe, min_len, max_len):
     pipe: a Stanza pipeline for tokenizing
     min_len, max_len: can be None to not filter by this attribute
     """
+    # Local, fast lookups
+    from stanza.utils.datasets.constituency.selftrain import (DEV_RE, JA_RE,
+                                                              ZH_RE)
+
     results = []
     docs = [stanza.Document([], text=t) for t in docs]
-    if len(docs) == 0:
+    if not docs:
         return results
+
     pipe(docs)
-    is_zh = pipe.lang and pipe.lang.startswith("zh")
-    is_ja = pipe.lang and pipe.lang.startswith("ja")
-    is_vi = pipe.lang and pipe.lang.startswith("vi")
+    lang = getattr(pipe, "lang", None)
+    is_zh = lang and lang.startswith("zh")
+    is_ja = lang and lang.startswith("ja")
+    is_vi = lang and lang.startswith("vi")
+
+    # Precompute the set of fast-to-test forbidden chars for text
+    forbidden_chars = {"|", "_", "<", ">", "[", "]", "—"}
+    # For the word-internal filter, use a tuple for fast looping and membership test
+    quoted_parens_chars = ('"', "(", ")")
+    # Avoid repeated attribute lookups
+    append_result = results.append
+    zh_findall = ZH_RE.findall
+    ja_findall = JA_RE.findall
+    dev_findall = DEV_RE.findall
+
     for doc in docs:
         for sentence in doc.sentences:
-            if min_len and len(sentence.words) < min_len:
+            words = sentence.words
+            # Precompute length outside generator to avoid multiple calls
+            num_words = len(words)
+            if min_len and num_words < min_len:
                 continue
-            if max_len and len(sentence.words) > max_len:
+            if max_len and num_words > max_len:
                 continue
+
+            # Compose text only once, after cheap checks
             text = sentence.text
-            if (text.find("|") >= 0 or text.find("_") >= 0 or
-                text.find("<") >= 0 or text.find(">") >= 0 or
-                text.find("[") >= 0 or text.find("]") >= 0 or
-                text.find('—') >= 0):   # an em dash, seems to be part of lists
+            # Fast forbidden char check using set intersection
+            if any(c in text for c in forbidden_chars):
                 continue
-            # the VI tokenizer in particular doesn't split these well
-            if any(any(w.text.find(c) >= 0 and len(w.text) > 1 for w in sentence.words)
-                   for c in '"()'):
+
+            # This is the HOTTEST line: optimize by reordering loops and minimizing attribute access
+            skip = False
+            for w in words:
+                wtext = w.text
+                # Only check for quote/parens if len > 1
+                if len(wtext) > 1:
+                    for c in quoted_parens_chars:
+                        if c in wtext:
+                            skip = True
+                            break
+                    if skip:
+                        break
+            if skip:
                 continue
-            text = [w.text.replace(" ", "_") for w in sentence.words]
-            text = " ".join(text)
-            if any(len(w.text) >= 50 for w in sentence.words):
-                # skip sentences where some of the words are unreasonably long
-                # could make this an argument
+
+            # Now build the tokenized text string
+            # In-place replacement is not possible, but we avoid re-access of w.text and minimize allocations
+            token_strings = []
+            long_word = False
+            for w in words:
+                # Replace spaces by underscores and gather word length for the next step
+                wtext = w.text
+                if len(wtext) >= 50:
+                    long_word = True
+                    break
+                token_strings.append(wtext.replace(" ", "_"))
+            if long_word:
                 continue
-            if not is_zh and len(ZH_RE.findall(text)) > 250:
-                # some Chinese sentences show up in VI Wikipedia
-                # we want to eliminate ones which will choke the bert models
+            text = " ".join(token_strings)
+
+            # Apply (cached) regex only if needed (as before)
+            if not is_zh and len(zh_findall(text)) > 250:
                 continue
-            if not is_ja and len(JA_RE.findall(text)) > 150:
-                # some Japanese sentences also show up in VI Wikipedia
-                # we want to eliminate ones which will choke the bert models
+            if not is_ja and len(ja_findall(text)) > 150:
                 continue
-            if is_vi and len(DEV_RE.findall(text)) > 100:
-                # would need some list of languages that use
-                # Devanagari to eliminate sentences from all datasets.
-                # Otherwise we might accidentally throw away all the
-                # text from a language we need (although that would be obvious)
+            if is_vi and len(dev_findall(text)) > 100:
                 continue
-            results.append(text)
+            append_result(text)
     return results
 
 def find_matching_trees(docs, num_sentences, accepted_trees, tag_pipe, parser_pipes, shuffle=True, chunk_size=10, max_len=140, min_len=10, output_ptb=False):
