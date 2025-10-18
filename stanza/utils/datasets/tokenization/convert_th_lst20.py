@@ -24,36 +24,42 @@ from stanza.utils.datasets.tokenization.process_thai_tokenization import write_s
 def read_document(lines, spaces_after, split_clauses):
     document = []
     sentence = []
+
+    replace_nbsp = "\xa0" in "".join(lines)  # Avoid per-token check unless needed
     for line in lines:
-        line = line.strip()
-        if not line:
+        line_stripped = line.strip()
+        if not line_stripped:
             if sentence:
                 if spaces_after:
                     sentence[-1] = (sentence[-1][0], True)
                 document.append(sentence)
                 sentence = []
         else:
-            pieces = line.split("\t")
-            # there are some nbsp in tokens in lst20, but the downstream tools expect spaces
-            pieces = [p.replace("\xa0", " ") for p in pieces]
-            if split_clauses and pieces[0] == '_' and pieces[3] == 'O':
+            # Fast path: only replace nbsp if necessary
+            pieces = line_stripped.split("\t")
+            if replace_nbsp:
+                for i, p in enumerate(pieces):
+                    if "\xa0" in p:  # Replace only on string with nbsp
+                        pieces[i] = p.replace("\xa0", " ")
+
+            token = pieces[0]
+            # shortcut for 'O' check so we do not build pieces[3]
+            # but can't avoid due to original logic (index required)
+            if split_clauses and token == '_' and pieces[3] == 'O':
                 if sentence:
-                    # note that we don't need to check spaces_after
-                    # the "token" is a space anyway
                     sentence[-1] = (sentence[-1][0], True)
                     document.append(sentence)
                     sentence = []
-            elif pieces[0] == '_':
+            elif token == '_':
                 sentence[-1] = (sentence[-1][0], True)
             else:
-                sentence.append((pieces[0], False))
+                sentence.append((token, False))
 
     if sentence:
         if spaces_after:
             sentence[-1] = (sentence[-1][0], True)
         document.append(sentence)
         sentence = []
-    # TODO: is there any way to divide up a single document into paragraphs?
     return [[document]]
 
 def retokenize_document(lines):
