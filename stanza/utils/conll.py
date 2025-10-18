@@ -29,8 +29,8 @@ class CoNLL:
         for line_idx, line in enumerate(f):
             # leave whitespace such as NBSP, in case it is meaningful in the conll-u doc
             line = line.lstrip().rstrip(' \n\r\t')
-            if len(line) == 0:
-                if len(sent) > 0:
+            if not line:
+                if sent:
                     doc.append(sent)
                     sent = []
                     doc_comments.append(sent_comments)
@@ -49,8 +49,8 @@ class CoNLL:
                         array[-1] = "%s=%d" % (LINE_NUMBER, line_idx)
                     else:
                         array[-1] = "%s|%s=%d" % (array[-1], LINE_NUMBER, line_idx)
-                sent += [array]
-        if len(sent) > 0:
+                sent.append(array)
+        if sent:
             doc.append(sent)
             doc_comments.append(sent_comments)
         return doc, doc_comments
