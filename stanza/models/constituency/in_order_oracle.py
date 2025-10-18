@@ -67,7 +67,7 @@ def fix_wrong_open_multiple_subtrees(gold_transition, pred_transition, gold_sequ
     return fix_wrong_open_subtrees(gold_transition, pred_transition, gold_sequence, gold_index, root_labels, more_than_two=True)
 
 def advance_past_unaries(gold_sequence, cur_index):
-    while cur_index + 2 < len(gold_sequence) and isinstance(gold_sequence[cur_index], OpenConstituent) and isinstance(gold_sequence[cur_index+1], CloseConstituent):
+    while cur_index + 2 < len(gold_sequence) and type(gold_sequence[cur_index]) is OpenConstituent and type(gold_sequence[cur_index+1]) is CloseConstituent:
         cur_index += 2
     return cur_index
 
@@ -284,15 +284,15 @@ def fix_shift_close(gold_transition, pred_transition, gold_sequence, gold_index,
     The easiest fix here is to just restore the NT_X.
     """
 
-    if not isinstance(pred_transition, CloseConstituent):
+    if not type(pred_transition) is CloseConstituent:
         return None
 
     # this fix can also be applied if there were unaries on the
     # previous constituent.  we just skip those until the Shift
     cur_index = gold_index
-    if isinstance(gold_transition, OpenConstituent):
+    if type(gold_transition) is OpenConstituent:
         cur_index = advance_past_unaries(gold_sequence, cur_index)
-    if not isinstance(gold_sequence[cur_index], Shift):
+    if not type(gold_sequence[cur_index]) is Shift:
         return None
 
     prev_open_index = find_previous_open(gold_sequence, gold_index)
