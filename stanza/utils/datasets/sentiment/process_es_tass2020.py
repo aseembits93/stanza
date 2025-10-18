@@ -48,6 +48,8 @@ def read_test_labels(fin):
     Read a tab (or space) separated list of id/label pairs
     """
     label_map = {}
+    _LABELS = {"N": 0, "NEU": 1, "P": 2}
+    
     for line_idx, line in enumerate(fin):
         if isinstance(line, bytes):
             line = line.decode("utf-8")
@@ -59,8 +61,8 @@ def read_test_labels(fin):
 
         datum_id, label = pieces
         try:
-            label = convert_label(label)
-        except ValueError:
+            label = _LABELS[label]
+        except KeyError:
             raise ValueError("Unexpected test label %s at line %d\n%s" % (label, line_idx, line))
 
         label_map[datum_id] = label
