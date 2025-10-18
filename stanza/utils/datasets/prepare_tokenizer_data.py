@@ -32,28 +32,31 @@ def find_next_word(index, text, word, output):
     """
     Locate the next word in the text. In case a paragraph break is found, also write paragraph break to labels.
     """
+    text_len = len(text)
+    word_len = len(word)
     idx = 0
-    word_sofar = ''
-    while index < len(text) and idx < len(word):
+    word_sofar = []
+    while index < text_len and idx < word_len:
         para_break, break_len = is_para_break(index, text)
         if para_break:
             # multiple newlines found, paragraph break
-            if len(word_sofar) > 0:
-                assert re.match(r'^\s+$', word_sofar), 'Found non-empty string at the end of a paragraph that doesn\'t match any token: |{}|'.format(word_sofar)
-                word_sofar = ''
+            if word_sofar:
+                ws = ''.join(word_sofar)
+                assert re.match(r'^\s+$', ws), 'Found non-empty string at the end of a paragraph that doesn\'t match any token: |{}|'.format(ws)
+                word_sofar.clear()
 
             output.write('\n\n')
             index += break_len - 1
-        elif re.match(r'^\s$', text[index]) and not re.match(r'^\s$', word[idx]):
+        elif text[index].isspace() and not word[idx].isspace():
             # whitespace found, and whitespace is not part of a word
-            word_sofar += text[index]
+            word_sofar.append(text[index])
         else:
             # non-whitespace char, or a whitespace char that's part of a word
-            word_sofar += text[index]
-            assert text[index].replace('\n', ' ') == word[idx], "Character mismatch: raw text contains |%s| but the next word is |%s|." % (word_sofar, word)
+            word_sofar.append(text[index])
+            assert text[index].replace('\n', ' ') == word[idx], "Character mismatch: raw text contains |%s| but the next word is |%s|." % (''.join(word_sofar), word)
             idx += 1
         index += 1
-    return index, word_sofar
+    return index, ''.join(word_sofar)
 
 def main(args):
     parser = argparse.ArgumentParser()
