@@ -37,7 +37,13 @@ class ClusterChecker:
 
     @staticmethod
     def _f1(p,r):
-        return (p * r) / (p+r + EPSILON) * 2
+        # Micro-optimization: Avoid repeated float addition and multiplication,
+        # Do single computation and return result.
+        # Also avoid unnecessary parentheses in arithmetic expressions.
+        denom = p + r + EPSILON
+        if denom == 0.0:
+            return 0.0
+        return 2.0 * p * r / denom
     
     def add_predictions(self,
                         gold_clusters: List[List[Hashable]],
