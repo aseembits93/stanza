@@ -304,51 +304,114 @@ def fix_shift_close(gold_transition, pred_transition, gold_sequence, gold_index,
     return gold_sequence[:gold_index] + [pred_transition, prev_open] + gold_sequence[cur_index:]
 
 def fix_close_shift_open_bracket(gold_transition, pred_transition, gold_sequence, gold_index, root_labels, ambiguous, late):
-    if not isinstance(gold_transition, CloseConstituent):
+    # Fast type check shortcut: use type() instead of isinstance for known classes
+    if type(gold_transition) is not CloseConstituent:
         return None
-    if not isinstance(pred_transition, Shift):
+    if type(pred_transition) is not Shift:
         return None
 
+    # Check the length only once statically
     if len(gold_sequence) < gold_index + 3:
         return None
-    if not isinstance(gold_sequence[gold_index+1], OpenConstituent):
+    # Check type for gold_sequence[gold_index+1] fast
+    if type(gold_sequence[gold_index+1]) is not OpenConstituent:
         return None
 
-    open_index = advance_past_unaries(gold_sequence, gold_index+1)
-    if not isinstance(gold_sequence[open_index], OpenConstituent):
+    # inline loop body of advance_past_unaries for slight memory/perf gain
+    open_idx = gold_index + 1
+    seq_len = len(gold_sequence)
+    # Since usually only a few unaries, avoid global import call
+    while (
+        open_idx + 2 < seq_len and
+        type(gold_sequence[open_idx]) is OpenConstituent and
+        type(gold_sequence[open_idx + 1]) is CloseConstituent
+    ):
+        open_idx += 2
+
+    if type(gold_sequence[open_idx]) is not OpenConstituent:
         return None
-    if not isinstance(gold_sequence[open_index+1], Shift):
+    if type(gold_sequence[open_idx+1]) is not Shift:
         return None
 
-    # check that the next operation was to open a *different* constituent
-    # from the one we just closed
-    prev_open_index = find_previous_open(gold_sequence, gold_index)
-    if prev_open_index is None:
+    # Efficient scan for previous open (find_previous_open), by localizing memory accesses
+    # Mirror the logic of find_previous_open, but use type() to speed up and avoid function call overhead
+    count = 0
+    idx = gold_index - 1
+    prev_open_idx = None
+    while idx >= 0:
+        t = type(gold_sequence[idx])
+        if t is OpenConstituent:
+            count += 1
+            if count > 0:
+                prev_open_idx = idx
+                break
+        elif t is CloseConstituent:
+            count -= 1
+        idx -= 1
+    if prev_open_idx is None:
         return None
-    prev_open = gold_sequence[prev_open_index]
-    if gold_sequence[open_index] == prev_open:
+    prev_open = gold_sequence[prev_open_idx]
+    if gold_sequence[open_idx] == prev_open:
         return None
 
-    # check that the following stuff is a single bracket, not multiple brackets
-    end_index = find_in_order_constituent_end(gold_sequence, open_index+1)
-    if ambiguous and isinstance(gold_sequence[end_index], CloseConstituent):
-        return None
-    elif not ambiguous and isinstance(gold_sequence[end_index], Shift):
+    # Efficient scan for in_order_constituent_end, inlined optimized loop
+    count = 0
+    saw_shift = False
+    idx = open_idx + 1
+    end_idx = None
+    while idx < seq_len:
+        t = type(gold_sequence[idx])
+        if t is OpenConstituent:
+            count += 1
+        elif t is CloseConstituent:
+            count -= 1
+            if count == -1:
+                end_idx = idx
+                break
+        elif t is Shift:
+            if saw_shift and count == 0:
+                end_idx = idx
+                break
+            else:
+                saw_shift = True
+        idx += 1
+    if end_idx is None:
         return None
 
-    # if closing at the end of the next blocks,
-    # instead of closing after the first block ends,
-    # we go to the end of the last block
+    # Only now: optimize ambiguous/Close check with type()
+    if ambiguous and type(gold_sequence[end_idx]) is CloseConstituent:
+        return None
+    elif not ambiguous and type(gold_sequence[end_idx]) is Shift:
+        return None
+
+    # Optimize late branch: call advance_past_constituents, safe to keep as function
     if late:
-        end_index = advance_past_constituents(gold_sequence, open_index+1)
+        end_idx_late = advance_past_constituents(gold_sequence, open_idx + 1)
+        if end_idx_late is not None:
+            end_idx = end_idx_late
 
-    return gold_sequence[:gold_index] + gold_sequence[open_index+1:end_index] + gold_sequence[gold_index:open_index+1] + gold_sequence[end_index:]
+    # Optimize sequence slicing: avoid repeated allocations
+    # (Python internal optimizations, just keep as is)
+    return (
+        gold_sequence[:gold_index]
+        + gold_sequence[open_idx + 1 : end_idx]
+        + gold_sequence[gold_index : open_idx + 1]
+        + gold_sequence[end_idx :]
+    )
 
 def fix_close_open_shift_unambiguous_bracket(gold_transition, pred_transition, gold_sequence, gold_index, root_labels, model, state):
     return fix_close_shift_open_bracket(gold_transition, pred_transition, gold_sequence, gold_index, root_labels, ambiguous=False, late=False)
 
 def fix_close_open_shift_ambiguous_bracket_early(gold_transition, pred_transition, gold_sequence, gold_index, root_labels, model, state):
-    return fix_close_shift_open_bracket(gold_transition, pred_transition, gold_sequence, gold_index, root_labels, ambiguous=True, late=False)
+    return fix_close_shift_open_bracket(
+        gold_transition,
+        pred_transition,
+        gold_sequence,
+        gold_index,
+        root_labels,
+        ambiguous=True,
+        late=False,
+    )
 
 def fix_close_open_shift_ambiguous_bracket_late(gold_transition, pred_transition, gold_sequence, gold_index, root_labels, model, state):
     return fix_close_shift_open_bracket(gold_transition, pred_transition, gold_sequence, gold_index, root_labels, ambiguous=True, late=True)
