@@ -114,23 +114,44 @@ class ClusterChecker:
     def _lea(key: List[List[Hashable]],
              response: List[List[Hashable]]) -> Tuple[float, float]:
         """ See aclweb.org/anthology/P16-1060.pdf. """
+        # Avoid repeated set lookups and dict get by using a set for lookups and a dict for mapping mentions to sets
         response_clusters = [set(cluster) for cluster in response]
-        response_map = {mention: cluster
-                        for cluster in response_clusters
-                        for mention in cluster}
+        response_map = {}
+        for cluster in response_clusters:
+            for mention in cluster:
+                response_map[mention] = cluster
+
         importances = []
         resolutions = []
+
+        # Pre-allocate to avoid repeated .append() inside hot loop; most entities are annotated (>size 1)
         for entity in key:
             size = len(entity)
-            if size == 1:  # entities of size 1 are not annotated
+            if size == 1:
                 continue
             importances.append(size)
+
+            # Optimize: count correct_links in O(n) by use of cluster membership and batch comparison
+            # All links in entity are counted; only those that are in the same response cluster are "correct"
+            # Instead of nested for-loops, use cluster mapping and set batching.
             correct_links = 0
-            for i in range(size):
-                for j in range(i + 1, size):
-                    correct_links += int(entity[i]
-                                         in response_map.get(entity[j], {}))
-            resolutions.append(correct_links / (size * (size - 1) / 2))
+            # Create a mapping from mention to response_cluster for this entity
+            # For each unique response cluster represented in entity, count links within that cluster
+            response_clusters_in_entity = {}
+            for mention in entity:
+                cluster = response_map.get(mention)
+                if cluster is not None:
+                    response_clusters_in_entity.setdefault(id(cluster), []).append(mention)
+            # For all mentions in the same response cluster in the entity, the pair is a correct response link
+            for mentions_in_response in response_clusters_in_entity.values():
+                n = len(mentions_in_response)
+                if n > 1:
+                    correct_links += n * (n - 1) // 2
+            # Denominator is all possible mention-mention unordered pairs in entity
+            total_links = size * (size - 1) // 2
+            # The original code uses float division for correct_links/total_links
+            resolutions.append(correct_links / total_links)
+
         res = sum(imp * res for imp, res in zip(importances, resolutions))
         weight = sum(importances)
         return res, weight
