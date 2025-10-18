@@ -12,10 +12,12 @@ MAX_NUM_FIELD = 5
 DOC_START_TOKEN = '-DOCSTART-'
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Convert the conll03 format data into conllu format.")
-    parser.add_argument('input', help='Input conll03 format data filename.')
-    parser.add_argument('output', help='Output json filename.')
-    args = parser.parse_args()
+    if not hasattr(parse_args, "_parser"):
+        parser = argparse.ArgumentParser(description="Convert the conll03 format data into conllu format.")
+        parser.add_argument('input', help='Input conll03 format data filename.')
+        parser.add_argument('output', help='Output json filename.')
+        parse_args._parser = parser
+    args = parse_args._parser.parse_args()
     return args
 
 def main():
